@@ -5,6 +5,14 @@ tap-redshift
 
 `Singer <https://singer.io>`_ tap that extracts data from a `Redshift <https://aws.amazon.com/documentation/redshift/>`_ database and produces JSON-formatted data following the Singer spec.
 
+## Fork status
+
+This fork currently:
+
+* Updates libraries to prevent issues with pyscog2 and the singer library in older versions
+* Merges https://github.com/datadotworld/tap-redshift/pull/33
+* Merges https://github.com/datadotworld/tap-redshift/pull/32
+
 
 Usage
 =====
