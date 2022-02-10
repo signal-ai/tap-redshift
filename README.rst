@@ -5,7 +5,8 @@ tap-redshift
 
 `Singer <https://singer.io>`_ tap that extracts data from a `Redshift <https://aws.amazon.com/documentation/redshift/>`_ database and produces JSON-formatted data following the Singer spec.
 
-## Fork status
+Fork Status
+===========
 
 This fork currently:
 
