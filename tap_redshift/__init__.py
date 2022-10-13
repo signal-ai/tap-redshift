@@ -511,14 +511,11 @@ def main_impl():
     connection = open_connection(args.config)
     db_schema = args.config.get('schema', 'public')
     if args.discover:
-        LOGGER.info("Running discovery")
         do_discover(connection, db_schema)
     elif args.catalog:
-        LOGGER.info(f"Running catalog: {args.catalog}")
         state = build_state(args.state, args.catalog)
         do_sync(connection, db_schema, args.catalog, state)
     elif args.properties:
-        LOGGER.info("Running properties")
         catalog = Catalog.from_dict(args.properties)
         state = build_state(args.state, catalog)
         do_sync(connection, db_schema, catalog, state)
