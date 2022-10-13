@@ -251,7 +251,7 @@ def open_connection(config):
     dbname = config['dbname'],
     user = config['user'],
     password = config['password']
-
+    LOGGER.info(f"Attempting Redshift connection: {dbname[0]} {host[0]} {port[0]}")
     connection = psycopg2.connect(
         host=host[0],
         port=port[0],
@@ -304,8 +304,10 @@ def sync_table(connection, catalog_entry, state):
     LOGGER.info('Beginning sync for {} table'.format(tap_stream_id))
     with connection.cursor() as cursor:
         schema, table = catalog_entry.table.split('.')
-        select = 'SELECT {} FROM {}.{}'.format(
+        database = catalog_entry.database
+        select = 'SELECT {} FROM {}.{}.{}'.format(
             ','.join('"{}"'.format(c) for c in columns),
+            '"{}"'.format(database),
             '"{}"'.format(schema),
             '"{}"'.format(table))
         params = {}
