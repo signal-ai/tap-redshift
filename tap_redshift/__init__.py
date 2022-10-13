@@ -142,7 +142,8 @@ def discover_catalog(conn, db_schema):
             stream=table_name,
             schema=schema,
             table=qualified_table_name,
-            metadata=metadata)
+            metadata=metadata,
+            database=db_name)
 
         entries.append(entry)
 
