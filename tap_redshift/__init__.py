@@ -90,7 +90,7 @@ def discover_catalog(conn, db_schema):
         WHERE schemaname = 'data_catalog'
         """
     )
-
+    LOGGER.info(f"TABLE_SPEC: {table_spec}")
     column_specs = select_all(
         conn,
         """
