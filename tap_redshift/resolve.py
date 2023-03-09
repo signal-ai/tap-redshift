@@ -86,6 +86,7 @@ def get_selected_properties(catalog_entry):
 
 
 def resolve_catalog(discovered, catalog, state):
+    LOGGER.warning(f"DISCOVERED: {discovered}")
     LOGGER.warning(f"STREAMS BEFORE FILTER{catalog.streams}")
     streams = list(filter(entry_is_selected, catalog.streams))
     LOGGER.warning(f"STREAMS AFTER FILTER{streams}")
