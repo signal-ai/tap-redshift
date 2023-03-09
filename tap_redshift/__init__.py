@@ -82,6 +82,14 @@ def discover_catalog(conn, db_schema):
         FROM INFORMATION_SCHEMA.Tables
         WHERE table_schema = '{}'
         """.format(db_schema))
+    # Include data catalog tables in validation.
+    table_spec += select_all(
+        conn,
+        """
+        SELECT tablename as table_name, tabletype as table_type FROM SVV_EXTERNAL_TABLES
+        WHERE schemaname = 'data_catalog'
+        """
+    )
 
     column_specs = select_all(
         conn,
