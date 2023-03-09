@@ -86,7 +86,7 @@ def discover_catalog(conn, db_schema):
     table_spec += select_all(
         conn,
         """
-        SELECT tablename as table_name, tabletype as table_type FROM SVV_EXTERNAL_TABLES
+        SELECT tablename as table_name, 'BASE TABLE' as table_type FROM SVV_EXTERNAL_TABLES
         WHERE schemaname = 'data_catalog'
         """
     )
