@@ -309,8 +309,9 @@ class TestRedShiftTap(object):
         assert_that(column_schema, equal_to(expected_schema))
 
     def test_table_metadata(self, discovery_conn, expected_catalog_from_db):
-        actual_catalog = tap_redshift.discover_catalog(discovery_conn,
-                                                       'public')
+        actual_catalog = tap_redshift.discover_catalog(
+            discovery_conn, 'test-db', 'public'
+        )
         for i, actual_entry in enumerate(actual_catalog.streams):
             expected_entry = expected_catalog_from_db.streams[i]
             actual_metadata = metadata.to_map(actual_entry.metadata)

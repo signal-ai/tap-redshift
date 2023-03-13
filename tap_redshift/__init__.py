@@ -72,41 +72,34 @@ CONFIG = {}
 ROWS_PER_NETWORK_CALL = 40_000
 
 
-def discover_catalog(conn, db_schema):
+def discover_catalog(conn, db_name, db_schema):
     '''Returns a Catalog describing the structure of the database.'''
 
     table_spec = select_all(
         conn,
-        """
+        f"""
         SELECT table_name, table_type
-        FROM INFORMATION_SCHEMA.Tables
-        WHERE table_schema = '{}'
-        """.format(db_schema))
-    # Include data catalog tables in validation.
-    table_spec += select_all(
-        conn,
-        """
-        SELECT tablename as table_name, 'BASE TABLE' as table_type FROM SVV_EXTERNAL_TABLES
-        WHERE schemaname = 'data_catalog'
+        FROM SVV_ALL_TABLES
+        WHERE schema_name = '{db_schema}' and database_name = '{db_name}'
         """
     )
     LOGGER.info(f"TABLE_SPEC: {table_spec}")
     column_specs = select_all(
         conn,
+        f"""
+            SELECT c.table_name, c.ordinal_position, c.column_name, c.data_type,
+            c.is_nullable
+            FROM SVV_ALL_TABLES t
+            JOIN SVV_ALL_COLUMNS c
+            c.schema_name = t.schema_name
+            WHERE t.schema_name = '{db_schema}' and t.database_name = '{db_name}'
+            ORDER BY c.table_name, c.ordinal_position
         """
-        SELECT c.table_name, c.ordinal_position, c.column_name, c.udt_name,
-        c.is_nullable
-        FROM INFORMATION_SCHEMA.Tables t
-        JOIN INFORMATION_SCHEMA.Columns c
-            ON c.table_name = t.table_name AND
-               c.table_schema = t.table_schema
-        WHERE t.table_schema = '{}'
-        ORDER BY c.table_name, c.ordinal_position
-        """.format(db_schema))
+    )
 
     pk_specs = select_all(
         conn,
-        """
+        f"""
         SELECT kc.table_name, kc.column_name
         FROM information_schema.table_constraints tc
         JOIN information_schema.key_column_usage kc
@@ -114,13 +107,13 @@ def discover_catalog(conn, db_schema):
                kc.table_schema = tc.table_schema AND
                kc.constraint_name = tc.constraint_name
         WHERE tc.constraint_type = 'PRIMARY KEY' AND
-              tc.table_schema = '{}'
+        tc.table_schema = '{db_schema}'
         ORDER BY
           tc.table_schema,
           tc.table_name,
           kc.ordinal_position
-        """.format(db_schema))
-
+        """
+    )
     entries = []
     table_columns = [{'name': k, 'columns': [
         {'pos': t[1], 'name': t[2], 'type': t[3],
@@ -161,9 +154,9 @@ def discover_catalog(conn, db_schema):
     return Catalog(entries)
 
 
-def do_discover(conn, db_schema):
+def do_discover(conn, db_name, db_schema):
     LOGGER.info("Running discover")
-    discover_catalog(conn, db_schema).dump()
+    discover_catalog(conn, db_name, db_schema).dump()
     LOGGER.info("Completed discover")
 
 
@@ -174,7 +167,7 @@ def schema_for_column(c):
     inclusion = 'available'
     result = Schema(inclusion=inclusion)
 
-    if column_type == 'bool':
+    if column_type in ('bool', 'boolean'):
         result.type = 'boolean'
 
     elif column_type in BYTES_FOR_INTEGER_TYPE:
@@ -413,8 +406,8 @@ def sync_table(connection, catalog_entry, state):
         yield singer.StateMessage(value=copy.deepcopy(state))
 
 
-def generate_messages(conn, db_schema, catalog, state):
-    catalog = resolve.resolve_catalog(discover_catalog(conn, db_schema),
+def generate_messages(conn, db_name, db_schema, catalog, state):
+    catalog = resolve.resolve_catalog(discover_catalog(conn, db_name, db_schema),
                                       catalog, state)
 
     for catalog_entry in catalog.streams:
@@ -457,9 +450,9 @@ def coerce_datetime(o):
     raise TypeError("Type {} is not serializable".format(type(o)))
 
 
-def do_sync(conn, db_schema, catalog, state):
+def do_sync(conn, db_name, db_schema, catalog, state):
     LOGGER.info("Starting Redshift sync")
-    for message in generate_messages(conn, db_schema, catalog, state):
+    for message in generate_messages(conn, db_name, db_schema, catalog, state):
         sys.stdout.write(json.dumps(message.asdict(),
                          default=coerce_datetime,
                          use_decimal=True) + '\n')
@@ -522,15 +515,16 @@ def main_impl():
     CONFIG.update(args.config)
     connection = open_connection(args.config)
     db_schema = args.config.get('schema', 'public')
+    db_name = args.config.get('dbname', 'dev')
     if args.discover:
-        do_discover(connection, db_schema)
+        do_discover(connection, db_name, db_schema)
     elif args.catalog:
         state = build_state(args.state, args.catalog)
-        do_sync(connection, db_schema, args.catalog, state)
+        do_sync(connection, db_name, db_schema, args.catalog, state)
     elif args.properties:
         catalog = Catalog.from_dict(args.properties)
         state = build_state(args.state, catalog)
-        do_sync(connection, db_schema, catalog, state)
+        do_sync(connection, db_name, db_schema, catalog, state)
     else:
         LOGGER.info("No properties were selected")
 
