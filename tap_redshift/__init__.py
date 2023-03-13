@@ -75,14 +75,15 @@ CONFIG = {}
 ROWS_PER_NETWORK_CALL = 40_000
 
 
-def discover_catalog(conn, db_name, db_schema):
+def discover_catalog(conn, db_name, db_schemas):
     '''Returns a Catalog describing the structure of the database.'''
+    db_schemas = tuple(db_schemas)
     table_spec = select_all(
         conn,
         f"""
-        SELECT table_name, table_type
+        SELECT table_name, table_type, schema_name
         FROM SVV_ALL_TABLES
-        WHERE schema_name = '{db_schema}' and database_name = '{db_name}'
+        WHERE schema_name in {db_schemas} and database_name = '{db_name}'
         """
     )
     LOGGER.info(f"TABLE_SPEC: {table_spec}")
@@ -94,7 +95,7 @@ def discover_catalog(conn, db_name, db_schema):
             FROM SVV_ALL_TABLES t
             JOIN SVV_ALL_COLUMNS c
             ON c.table_name = t.table_name AND c.schema_name = t.schema_name
-            WHERE t.schema_name = '{db_schema}' and t.database_name = '{db_name}'
+            WHERE t.schema_name in {db_schemas} and t.database_name = '{db_name}'
             ORDER BY c.table_name, c.ordinal_position
         """
     )
@@ -109,7 +110,7 @@ def discover_catalog(conn, db_name, db_schema):
                kc.table_schema = tc.table_schema AND
                kc.constraint_name = tc.constraint_name
         WHERE tc.constraint_type = 'PRIMARY KEY' AND
-        tc.table_schema = '{db_schema}'
+        tc.table_schema in {db_schemas}
         ORDER BY
           tc.table_schema,
           tc.table_name,
@@ -126,10 +127,11 @@ def discover_catalog(conn, db_name, db_schema):
                  for k, v in groupby(pk_specs, key=lambda t: t[0])}
 
     table_types = dict(table_spec)
+    LOGGER.warning(f"TABLE_TYPES: {table_types}")
 
     for items in table_columns:
         table_name = items['name']
-        qualified_table_name = '{}.{}'.format(db_schema, table_name)
+
         cols = items['columns']
         schema = Schema(type='object',
                         properties={
@@ -141,8 +143,12 @@ def discover_catalog(conn, db_name, db_schema):
         db_name = conn.get_dsn_parameters()['dbname']
         metadata = create_column_metadata(
             db_name, cols, is_view, table_name, key_properties)
+
+        # TODO HERE
+        qualified_table_name = '{}.{}'.format(table_types.get(table_name), table_name)
         tap_stream_id = '{}.{}'.format(
             db_name, qualified_table_name)
+
         entry = CatalogEntry(
             tap_stream_id=tap_stream_id,
             stream=table_name,
