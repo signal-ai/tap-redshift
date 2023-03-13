@@ -77,6 +77,7 @@ ROWS_PER_NETWORK_CALL = 40_000
 
 def discover_catalog(conn, db_name, db_schema):
     '''Returns a Catalog describing the structure of the database.'''
+    db_schema = tuple(db_schema)
 
     table_spec = select_all(
         conn,
@@ -95,7 +96,7 @@ def discover_catalog(conn, db_name, db_schema):
             FROM SVV_ALL_TABLES t
             JOIN SVV_ALL_COLUMNS c
             ON c.table_name = t.table_name AND c.schema_name = t.schema_name
-            WHERE t.schema_name in '{db_schema}' and t.database_name = '{db_name}'
+            WHERE t.schema_name in '{tuple(db_schema)}' and t.database_name = '{db_name}'
             ORDER BY c.table_name, c.ordinal_position
         """
     )
