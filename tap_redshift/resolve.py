@@ -88,11 +88,7 @@ def get_selected_properties(catalog_entry):
 
 
 def resolve_catalog(discovered, catalog, state):
-    LOGGER.warning(f"DISCOVERED: {discovered}")
-    LOGGER.warning(f"CATALOG: {catalog}")
-    LOGGER.warning(f"STREAMS BEFORE FILTER: {catalog.streams}")
     streams = list(filter(entry_is_selected, catalog.streams))
-    LOGGER.warning(f"STREAMS AFTER FILTER: {streams}")
 
     currently_syncing = singer.get_currently_syncing(state)
     if currently_syncing:
@@ -104,9 +100,7 @@ def resolve_catalog(discovered, catalog, state):
     # Iterate over the streams in the input catalog and match each one up
     # with the same stream in the discovered catalog.
     for catalog_entry in streams:
-        LOGGER.warning(f"catalog_entry: {catalog_entry.tap_stream_id}")
         discovered_table = discovered.get_stream(catalog_entry.tap_stream_id)
-        LOGGER.warning(f"DISCONVEREDTABLES: {discovered_table}")
         if not discovered_table:
             LOGGER.warning('Database {} table {} selected but does not exist'
                            .format(catalog_entry.database,
