@@ -75,6 +75,13 @@ CONFIG = {}
 ROWS_PER_NETWORK_CALL = 40_000
 
 
+def table_spec_to_dict(table_spec):
+    table_spec_dict = {}
+    for table in table_spec:
+        table_spec_dict[table[0]] = {'table_type': table[1], 'table_schema': table[2]}
+    return table_spec_dict
+
+
 def discover_catalog(conn, db_name, db_schemas):
     '''Returns a Catalog describing the structure of the database.'''
     db_schemas = tuple(db_schemas)
@@ -121,14 +128,12 @@ def discover_catalog(conn, db_name, db_schemas):
     table_columns = [{'name': k, 'columns': [
         {'pos': t[1], 'name': t[2], 'type': t[3],
          'nullable': t[4]} for t in v]}
-        for k, v in groupby(column_specs, key=lambda t: t[0])]
+                     for k, v in groupby(column_specs, key=lambda t: t[0])]
 
     table_pks = {k: [t[1] for t in v]
                  for k, v in groupby(pk_specs, key=lambda t: t[0])}
-    LOGGER.warning(f"TABLE_SPEC:{table_spec}")
-    LOGGER.warning(f"TABLE_SPEC TYPE: {type(table_spec)}")
-    table_types = dict(table_spec[0:1])
-    LOGGER.warning(f"TABLE_TYPES: {table_types}")
+    table_spec_dict = table_spec_to_dict(table_spec)
+    LOGGER.warning(f"TABLE_SPEC_DICT: {table_spec_dict}")
 
     for items in table_columns:
         table_name = items['name']
@@ -140,13 +145,14 @@ def discover_catalog(conn, db_name, db_schemas):
         key_properties = [
             column for column in table_pks.get(table_name, [])
             if schema.properties[column].inclusion != 'unsupported']
-        is_view = table_types.get(table_name) == 'VIEW'
+        is_view = table_spec_dict.get(table_name)['table_type'] == 'VIEW'
         db_name = conn.get_dsn_parameters()['dbname']
         metadata = create_column_metadata(
             db_name, cols, is_view, table_name, key_properties)
-
-        # TODO HERE
-        qualified_table_name = '{}.{}'.format(table_types.get(table_name), table_name)
+        qualified_table_name = '{}.{}'.format(
+            table_spec_dict.get(table_name)['table_schema'],
+            table_name,
+        )
         tap_stream_id = '{}.{}'.format(
             db_name, qualified_table_name)
 
@@ -463,8 +469,8 @@ def do_sync(conn, db_name, db_schema, catalog, state):
     LOGGER.info("Starting Redshift sync")
     for message in generate_messages(conn, db_name, db_schema, catalog, state):
         sys.stdout.write(json.dumps(message.asdict(),
-                         default=coerce_datetime,
-                         use_decimal=True) + '\n')
+                                    default=coerce_datetime,
+                                    use_decimal=True) + '\n')
         sys.stdout.flush()
     LOGGER.info("Completed sync")
 
