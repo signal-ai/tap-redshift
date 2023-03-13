@@ -125,8 +125,9 @@ def discover_catalog(conn, db_name, db_schemas):
 
     table_pks = {k: [t[1] for t in v]
                  for k, v in groupby(pk_specs, key=lambda t: t[0])}
-
-    table_types = dict(table_spec)
+    LOGGER.warning(f"TABLE_SPEC:{table_spec}")
+    LOGGER.warning(f"TABLE_SPEC TYPE: {type(table_spec)}")
+    table_types = dict(table_spec[0:1])
     LOGGER.warning(f"TABLE_TYPES: {table_types}")
 
     for items in table_columns:
