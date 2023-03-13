@@ -76,6 +76,7 @@ ROWS_PER_NETWORK_CALL = 40_000
 
 
 def table_spec_to_dict(table_spec):
+    """Converts table_spec results to a dictionary with table names as keys."""
     table_spec_dict = {}
     for table in table_spec:
         table_spec_dict[table[0]] = {'table_type': table[1], 'table_schema': table[2]}
@@ -84,6 +85,7 @@ def table_spec_to_dict(table_spec):
 
 
 def transform_db_schema_type(db_schemas):
+    """Converts db_schemas for querying."""
     if type(db_schemas) == str:
         return f"('{db_schemas}')"
     elif type(db_schemas) == list:
