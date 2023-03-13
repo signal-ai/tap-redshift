@@ -91,7 +91,7 @@ def discover_catalog(conn, db_name, db_schema):
             c.is_nullable
             FROM SVV_ALL_TABLES t
             JOIN SVV_ALL_COLUMNS c
-            c.schema_name = t.schema_name
+            ON c.table_name = t.table_name AND c.schema_name = t.schema_name
             WHERE t.schema_name = '{db_schema}' and t.database_name = '{db_name}'
             ORDER BY c.table_name, c.ordinal_position
         """
