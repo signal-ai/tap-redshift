@@ -77,7 +77,6 @@ ROWS_PER_NETWORK_CALL = 40_000
 
 def discover_catalog(conn, db_name, db_schema):
     '''Returns a Catalog describing the structure of the database.'''
-
     table_spec = select_all(
         conn,
         f"""
