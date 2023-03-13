@@ -90,7 +90,7 @@ def discover_catalog(conn, db_name, db_schema):
     column_specs = select_all(
         conn,
         f"""
-            SELECT c.table_name, c.ordinal_position, c.column_name, c.data_type,
+            SELECT DISTINCT c.table_name, c.ordinal_position, c.column_name, c.data_type,
             c.is_nullable
             FROM SVV_ALL_TABLES t
             JOIN SVV_ALL_COLUMNS c

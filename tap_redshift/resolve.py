@@ -67,8 +67,8 @@ def desired_columns(selected, table_schema):
 
 def entry_is_selected(catalog_entry):
     mdata = metadata.new()
-    LOGGER.WARNING(f"CATALOG.METADATA FOR {catalog_entry.tap_stream_id}: {catalog_entry.metadata}")
-    LOGGER.WARNING(f"BOOL RESOLUTION: {bool(catalog_entry.is_selected() or metadata.get(mdata, (), 'selected'))}")
+    LOGGER.warning(f"CATALOG.METADATA FOR {catalog_entry.tap_stream_id}: {catalog_entry.metadata}")
+    LOGGER.warning(f"BOOL RESOLUTION: {bool(catalog_entry.is_selected() or metadata.get(mdata, (), 'selected'))}")
     if catalog_entry.metadata is not None:
         mdata = metadata.to_map(catalog_entry.metadata)
     return bool(catalog_entry.is_selected()
@@ -90,9 +90,9 @@ def get_selected_properties(catalog_entry):
 def resolve_catalog(discovered, catalog, state):
     LOGGER.warning(f"DISCOVERED: {discovered}")
     LOGGER.warning(f"CATALOG: {catalog}")
-    LOGGER.WARNING(f"STREAMS BEFORE FILTER: {catalog.streams}")
+    LOGGER.warning(f"STREAMS BEFORE FILTER: {catalog.streams}")
     streams = list(filter(entry_is_selected, catalog.streams))
-    LOGGER.WARNING(f"STREAMS AFTER FILTER: {streams}")
+    LOGGER.warning(f"STREAMS AFTER FILTER: {streams}")
 
     currently_syncing = singer.get_currently_syncing(state)
     if currently_syncing:
