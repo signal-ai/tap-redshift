@@ -95,6 +95,12 @@ def transform_db_schema_type(db_schemas):
             return f"('{db_schemas[0]}')"
 
 
+def handle_external_nullable_column(column):
+    if column[4] not in [True, False]:
+        return True
+    return column[4]
+
+
 def discover_catalog(conn, db_name, db_schemas):
     '''Returns a Catalog describing the structure of the database.'''
     db_schemas = transform_db_schema_type(db_schemas)
@@ -140,7 +146,7 @@ def discover_catalog(conn, db_name, db_schemas):
     entries = []
     table_columns = [{'name': k, 'columns': [
         {'pos': t[1], 'name': t[2], 'type': t[3],
-         'nullable': t[4]} for t in v]}
+         'nullable': handle_external_nullable_column(t[4])} for t in v]}
                      for k, v in groupby(column_specs, key=lambda t: t[0])]
 
     table_pks = {k: [t[1] for t in v]
