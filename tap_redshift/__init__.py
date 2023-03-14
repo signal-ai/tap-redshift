@@ -140,7 +140,7 @@ def discover_catalog(conn, db_name, db_schemas):
     entries = []
     LOGGER.warning(f"column_specs before transformation: {column_specs}")
     table_columns = [{'name': k, 'columns': [
-        {'pos': t[1], 'name': t[2], 'nullable': t[3], 'type': t[4]} for t in v
+        {'pos': t[1], 'name': t[2], 'type': t[3], 'nullable': t[4], } for t in v
     ]} for k, v in groupby(column_specs, key=lambda t: t[0])]
     LOGGER.warning(f"Table_columns after transformation: {table_columns}")
     table_pks = {k: [t[1] for t in v]
