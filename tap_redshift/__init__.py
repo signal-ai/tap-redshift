@@ -96,9 +96,10 @@ def transform_db_schema_type(db_schemas):
 
 
 def handle_external_nullable_column(column):
-    if column[4] not in [True, False]:
+    """If the column does not contain True or False default to True."""
+    if column not in [True, False]:
         return True
-    return column[4]
+    return column
 
 
 def discover_catalog(conn, db_name, db_schemas):
