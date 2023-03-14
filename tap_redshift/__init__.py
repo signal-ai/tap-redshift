@@ -145,11 +145,12 @@ def discover_catalog(conn, db_name, db_schemas):
         """
     )
     entries = []
+    LOGGER.warning(f"RAW COLUMN SPECS: {column_specs}")
     table_columns = [{'name': k, 'columns': [
         {'pos': t[1], 'name': t[2], 'type': t[3],
          'nullable': handle_external_nullable_column(t[4])} for t in v]}
                      for k, v in groupby(column_specs, key=lambda t: t[0])]
-
+    LOGGER.warning(f"FORMATTED TABLE COLUMNS: {table_columns}")
     table_pks = {k: [t[1] for t in v]
                  for k, v in groupby(pk_specs, key=lambda t: t[0])}
     table_spec_dict = table_spec_to_dict(table_spec)
