@@ -55,12 +55,15 @@ STRING_TYPES = {'char', 'character', 'nchar', 'bpchar', 'text', 'varchar',
 
 BYTES_FOR_INTEGER_TYPE = {
     'int2': 2,
+    'smallint': 2,
     'int': 4,
     'int4': 4,
-    'int8': 8
+    'integer': 4,
+    'int8': 8,
+    'bigint': 8
 }
 
-FLOAT_TYPES = {'float', 'float4', 'float8'}
+FLOAT_TYPES = {'float', 'float4', 'float8', 'double precision', 'real'}
 
 DATE_TYPES = {'date'}
 
@@ -72,33 +75,54 @@ CONFIG = {}
 ROWS_PER_NETWORK_CALL = 40_000
 
 
-def discover_catalog(conn, db_schema):
-    '''Returns a Catalog describing the structure of the database.'''
+def table_spec_to_dict(table_spec):
+    """Converts table_spec results to a dictionary with table names as keys."""
+    table_spec_dict = {}
+    for table in table_spec:
+        table_spec_dict[table[0]] = {'table_type': table[1], 'table_schema': table[2]}
+    LOGGER.info(f"table_spec_dict: {table_spec_dict}")
+    return table_spec_dict
 
+
+def transform_db_schema_type(db_schemas):
+    """Converts db_schemas for querying."""
+    if type(db_schemas) == str:
+        return f"('{db_schemas}')"
+    elif type(db_schemas) == list:
+        if len(db_schemas) >= 2:
+            return tuple(db_schemas)
+        else:
+            return f"('{db_schemas[0]}')"
+
+
+def discover_catalog(conn, db_name, db_schemas):
+    '''Returns a Catalog describing the structure of the database.'''
+    db_schemas = transform_db_schema_type(db_schemas)
     table_spec = select_all(
         conn,
+        f"""
+        SELECT table_name, table_type, schema_name
+        FROM SVV_ALL_TABLES
+        WHERE schema_name in {db_schemas} and database_name = '{db_name}'
         """
-        SELECT table_name, table_type
-        FROM INFORMATION_SCHEMA.Tables
-        WHERE table_schema = '{}'
-        """.format(db_schema))
+    )
 
     column_specs = select_all(
         conn,
+        f"""
+            SELECT DISTINCT c.table_name, c.ordinal_position, c.column_name, c.data_type,
+            CASE WHEN c.is_nullable = '' THEN 'YES' ELSE c.is_nullable END AS is_nullable
+            FROM SVV_ALL_TABLES t
+            JOIN SVV_ALL_COLUMNS c
+            ON c.table_name = t.table_name AND c.schema_name = t.schema_name
+            WHERE t.schema_name in {db_schemas} and t.database_name = '{db_name}'
+            ORDER BY c.table_name, c.ordinal_position
         """
-        SELECT c.table_name, c.ordinal_position, c.column_name, c.udt_name,
-        c.is_nullable
-        FROM INFORMATION_SCHEMA.Tables t
-        JOIN INFORMATION_SCHEMA.Columns c
-            ON c.table_name = t.table_name AND
-               c.table_schema = t.table_schema
-        WHERE t.table_schema = '{}'
-        ORDER BY c.table_name, c.ordinal_position
-        """.format(db_schema))
+    )
 
     pk_specs = select_all(
         conn,
-        """
+        f"""
         SELECT kc.table_name, kc.column_name
         FROM information_schema.table_constraints tc
         JOIN information_schema.key_column_usage kc
@@ -106,27 +130,24 @@ def discover_catalog(conn, db_schema):
                kc.table_schema = tc.table_schema AND
                kc.constraint_name = tc.constraint_name
         WHERE tc.constraint_type = 'PRIMARY KEY' AND
-              tc.table_schema = '{}'
+        tc.table_schema in {db_schemas}
         ORDER BY
           tc.table_schema,
           tc.table_name,
           kc.ordinal_position
-        """.format(db_schema))
-
+        """
+    )
     entries = []
     table_columns = [{'name': k, 'columns': [
-        {'pos': t[1], 'name': t[2], 'type': t[3],
-         'nullable': t[4]} for t in v]}
-        for k, v in groupby(column_specs, key=lambda t: t[0])]
-
+        {'pos': t[1], 'name': t[2], 'type': t[3], 'nullable': t[4], } for t in v
+    ]} for k, v in groupby(column_specs, key=lambda t: t[0])]
     table_pks = {k: [t[1] for t in v]
                  for k, v in groupby(pk_specs, key=lambda t: t[0])}
-
-    table_types = dict(table_spec)
+    table_spec_dict = table_spec_to_dict(table_spec)
 
     for items in table_columns:
         table_name = items['name']
-        qualified_table_name = '{}.{}'.format(db_schema, table_name)
+
         cols = items['columns']
         schema = Schema(type='object',
                         properties={
@@ -134,12 +155,17 @@ def discover_catalog(conn, db_schema):
         key_properties = [
             column for column in table_pks.get(table_name, [])
             if schema.properties[column].inclusion != 'unsupported']
-        is_view = table_types.get(table_name) == 'VIEW'
+        is_view = table_spec_dict.get(table_name)['table_type'] == 'VIEW'
         db_name = conn.get_dsn_parameters()['dbname']
         metadata = create_column_metadata(
             db_name, cols, is_view, table_name, key_properties)
+        qualified_table_name = '{}.{}'.format(
+            table_spec_dict.get(table_name)['table_schema'],
+            table_name,
+        )
         tap_stream_id = '{}.{}'.format(
             db_name, qualified_table_name)
+
         entry = CatalogEntry(
             tap_stream_id=tap_stream_id,
             stream=table_name,
@@ -153,9 +179,9 @@ def discover_catalog(conn, db_schema):
     return Catalog(entries)
 
 
-def do_discover(conn, db_schema):
+def do_discover(conn, db_name, db_schema):
     LOGGER.info("Running discover")
-    discover_catalog(conn, db_schema).dump()
+    discover_catalog(conn, db_name, db_schema).dump()
     LOGGER.info("Completed discover")
 
 
@@ -166,7 +192,7 @@ def schema_for_column(c):
     inclusion = 'available'
     result = Schema(inclusion=inclusion)
 
-    if column_type == 'bool':
+    if column_type in ('bool', 'boolean'):
         result.type = 'boolean'
 
     elif column_type in BYTES_FOR_INTEGER_TYPE:
@@ -405,8 +431,8 @@ def sync_table(connection, catalog_entry, state):
         yield singer.StateMessage(value=copy.deepcopy(state))
 
 
-def generate_messages(conn, db_schema, catalog, state):
-    catalog = resolve.resolve_catalog(discover_catalog(conn, db_schema),
+def generate_messages(conn, db_name, db_schema, catalog, state):
+    catalog = resolve.resolve_catalog(discover_catalog(conn, db_name, db_schema),
                                       catalog, state)
 
     for catalog_entry in catalog.streams:
@@ -449,12 +475,12 @@ def coerce_datetime(o):
     raise TypeError("Type {} is not serializable".format(type(o)))
 
 
-def do_sync(conn, db_schema, catalog, state):
+def do_sync(conn, db_name, db_schema, catalog, state):
     LOGGER.info("Starting Redshift sync")
-    for message in generate_messages(conn, db_schema, catalog, state):
+    for message in generate_messages(conn, db_name, db_schema, catalog, state):
         sys.stdout.write(json.dumps(message.asdict(),
-                         default=coerce_datetime,
-                         use_decimal=True) + '\n')
+                                    default=coerce_datetime,
+                                    use_decimal=True) + '\n')
         sys.stdout.flush()
     LOGGER.info("Completed sync")
 
@@ -514,15 +540,16 @@ def main_impl():
     CONFIG.update(args.config)
     connection = open_connection(args.config)
     db_schema = args.config.get('schema', 'public')
+    db_name = args.config.get('dbname', 'dev')
     if args.discover:
-        do_discover(connection, db_schema)
+        do_discover(connection, db_name, db_schema)
     elif args.catalog:
         state = build_state(args.state, args.catalog)
-        do_sync(connection, db_schema, args.catalog, state)
+        do_sync(connection, db_name, db_schema, args.catalog, state)
     elif args.properties:
         catalog = Catalog.from_dict(args.properties)
         state = build_state(args.state, catalog)
-        do_sync(connection, db_schema, catalog, state)
+        do_sync(connection, db_name, db_schema, catalog, state)
     else:
         LOGGER.info("No properties were selected")
 

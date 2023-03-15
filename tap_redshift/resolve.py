@@ -67,6 +67,8 @@ def desired_columns(selected, table_schema):
 
 def entry_is_selected(catalog_entry):
     mdata = metadata.new()
+    LOGGER.warning(f"CATALOG.METADATA FOR {catalog_entry.tap_stream_id}: {catalog_entry.metadata}")
+    LOGGER.warning(f"BOOL RESOLUTION: {bool(catalog_entry.is_selected() or metadata.get(mdata, (), 'selected'))}")
     if catalog_entry.metadata is not None:
         mdata = metadata.to_map(catalog_entry.metadata)
     return bool(catalog_entry.is_selected()
