@@ -48,6 +48,10 @@ REQUIRED_CONFIG_KEYS = [
     'password',
     'start_date'
 ]
+
+STRING_TYPES = {'char', 'character', 'nchar', 'bpchar', 'text', 'varchar',
+                'character varying', 'nvarchar'}
+
 BYTES_FOR_INTEGER_TYPE = {
     'int2': 2,
     'smallint': 2,
