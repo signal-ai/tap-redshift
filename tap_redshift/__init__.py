@@ -122,6 +122,7 @@ def discover_catalog(conn, db_schema):
     table_types = dict(table_spec)
 
     for items in table_columns:
+        LOGGER.debug("Processing
         table_name = items['name']
         qualified_table_name = '{}.{}'.format(db_schema, table_name)
         cols = items['columns']
@@ -157,8 +158,10 @@ def do_discover(conn, db_schema):
 
 def schema_for_column(c):
     '''Returns the Schema object for the given Column.'''
+    LOGGER.debug(c]
     column_type = c['type'].lower()
-    column_nullable = c['nullable'].lower()
+    column_nullable = "true" if ('nullable' not in c or c['nullable'] is None) else c['nullable'].lower()
+
     inclusion = 'available'
     result = Schema(inclusion=inclusion)
 
