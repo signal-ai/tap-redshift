@@ -54,12 +54,15 @@ STRING_TYPES = {'char', 'character', 'nchar', 'bpchar', 'text', 'varchar',
 
 BYTES_FOR_INTEGER_TYPE = {
     'int2': 2,
+    'smallint': 2,
     'int': 4,
     'int4': 4,
-    'int8': 8
+    'integer': 4,
+    'int8': 8,
+    'bigint': 8
 }
 
-FLOAT_TYPES = {'float', 'float4', 'float8'}
+FLOAT_TYPES = {'float', 'float4', 'float8', 'double precision', 'real'}
 
 DATE_TYPES = {'date'}
 
@@ -76,38 +79,35 @@ def discover_catalog(conn, db_schema):
         conn,
         """
         SELECT table_name, table_type
-        FROM INFORMATION_SCHEMA.Tables
+        FROM SVV_TABLES
         WHERE table_schema = '{}'
         """.format(db_schema))
 
     column_specs = select_all(
         conn,
         """
-        SELECT c.table_name, c.ordinal_position, c.column_name, c.udt_name,
-        c.is_nullable
-        FROM INFORMATION_SCHEMA.Tables t
-        JOIN INFORMATION_SCHEMA.Columns c
-            ON c.table_name = t.table_name AND
-               c.table_schema = t.table_schema
-        WHERE t.table_schema = '{}'
-        ORDER BY c.table_name, c.ordinal_position
+        SELECT table_name, ordinal_position, column_name, data_type, is_nullable
+        FROM SVV_COLUMNS
+        WHERE table_schema = '{}'
+        ORDER BY table_name, ordinal_position
         """.format(db_schema))
 
     pk_specs = select_all(
         conn,
         """
-        SELECT kc.table_name, kc.column_name
-        FROM information_schema.table_constraints tc
-        JOIN information_schema.key_column_usage kc
-            ON kc.table_name = tc.table_name AND
-               kc.table_schema = tc.table_schema AND
-               kc.constraint_name = tc.constraint_name
-        WHERE tc.constraint_type = 'PRIMARY KEY' AND
-              tc.table_schema = '{}'
+        SELECT
+          c.relname AS table_name,
+          a.attname AS column_name
+        FROM
+          pg_catalog.pg_constraint AS con
+          JOIN pg_catalog.pg_class AS c ON c.oid = con.conrelid
+          JOIN pg_catalog.pg_attribute AS a ON a.attrelid = c.oid AND a.attnum = ANY(con.conkey)
+          JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
+        WHERE n.nspname = '{}' AND contype IN ('p')
         ORDER BY
-          tc.table_schema,
-          tc.table_name,
-          kc.ordinal_position
+          n.nspname,
+          table_name,
+          a.attnum;
         """.format(db_schema))
 
     entries = []
@@ -123,6 +123,7 @@ def discover_catalog(conn, db_schema):
 
     for items in table_columns:
         table_name = items['name']
+        LOGGER.debug("Processing" + table_name)
         qualified_table_name = '{}.{}'.format(db_schema, table_name)
         cols = items['columns']
         schema = Schema(type='object',
@@ -157,12 +158,14 @@ def do_discover(conn, db_schema):
 
 def schema_for_column(c):
     '''Returns the Schema object for the given Column.'''
+    LOGGER.debug(c)
     column_type = c['type'].lower()
-    column_nullable = c['nullable'].lower()
+    column_nullable = "true" if ('nullable' not in c or c['nullable'] is None) else c['nullable'].lower()
+
     inclusion = 'available'
     result = Schema(inclusion=inclusion)
 
-    if column_type == 'bool':
+    if column_type in ['bool', 'boolean']:
         result.type = 'boolean'
 
     elif column_type in BYTES_FOR_INTEGER_TYPE:
@@ -188,6 +191,10 @@ def schema_for_column(c):
         result.type = 'string'
         result.format = 'date'
 
+    elif column_type == 'super':
+        result.type = 'json'
+        result.format = 'json'
+
     else:
         result = Schema(None,
                         inclusion='unsupported',
@@ -204,7 +211,7 @@ def create_column_metadata(
         db_name, cols, is_view,
         table_name, key_properties=[]):
     mdata = metadata.new()
-    mdata = metadata.write(mdata, (), 'selected-by-default', False)
+    mdata = metadata.write(mdata, (), 'selected-by-default', True)
     if not is_view:
         mdata = metadata.write(
             mdata, (), 'table-key-properties', key_properties)
@@ -313,7 +320,7 @@ def sync_table(connection, catalog_entry, state):
         if start_date is not None:
             formatted_start_date = datetime.datetime.strptime(
                 start_date, '%Y-%m-%dT%H:%M:%SZ').astimezone()
-
+        LOGGER.debug(catalog_entry.metadata)
         replication_key = metadata.to_map(catalog_entry.metadata).get(
             (), {}).get('replication-key')
         replication_key_value = None
