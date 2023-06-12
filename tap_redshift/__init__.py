@@ -158,7 +158,7 @@ def do_discover(conn, db_schema):
 
 def schema_for_column(c):
     '''Returns the Schema object for the given Column.'''
-    LOGGER.debug(c]
+    LOGGER.debug(c)
     column_type = c['type'].lower()
     column_nullable = "true" if ('nullable' not in c or c['nullable'] is None) else c['nullable'].lower()
 
