@@ -162,7 +162,7 @@ def schema_for_column(c):
     inclusion = 'available'
     result = Schema(inclusion=inclusion)
 
-    if column_type IN ['bool', 'boolean']:
+    if column_type in ['bool', 'boolean']:
         result.type = 'boolean'
 
     elif column_type in BYTES_FOR_INTEGER_TYPE:
