@@ -320,7 +320,7 @@ def sync_table(connection, catalog_entry, state):
         if start_date is not None:
             formatted_start_date = datetime.datetime.strptime(
                 start_date, '%Y-%m-%dT%H:%M:%SZ').astimezone()
-
+        LOGGER.debug(catalog_entry.metadata)
         replication_key = metadata.to_map(catalog_entry.metadata).get(
             (), {}).get('replication-key')
         replication_key_value = None
