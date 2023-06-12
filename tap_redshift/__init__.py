@@ -188,6 +188,10 @@ def schema_for_column(c):
         result.type = 'string'
         result.format = 'date'
 
+    elif column_type == 'super':
+        result.type = 'json'
+        result.format = 'json'
+
     else:
         result = Schema(None,
                         inclusion='unsupported',
